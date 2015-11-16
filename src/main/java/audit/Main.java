@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -17,23 +18,26 @@ import java.util.List;
 import java.util.Map;
 
 import cn.ffcs.memory.BeanListHandler;
+import cn.ffcs.memory.ColumnHandler;
 import cn.ffcs.memory.ColumnListHandler;
 import cn.ffcs.memory.Memory;
+import cn.ffcs.memory.ResultSetHandler;
 
 public class Main {
-	
+	public static DBPool dbPool = new DBPool();
+	public static Memory memory = new Memory(dbPool.getDataSource());
 	public static void main(String[] args) {
 		try {
 			updateNewJobStatus();
+			clearBuildUnitUser();
+			clearManagerDepUser();
+			clearEntrustUser();
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
 	}
 	
 	public static void updateNewJobStatus() throws SQLException {
-		DBPool dbPool = new DBPool();
-		Memory memory = new Memory(dbPool.getDataSource());
-		
 		StringBuilder logStr = new StringBuilder("");
 		
 		// 对所有fnewjobstatus=1的记录根据fflowid进行分组，并统计每组的记录条数
@@ -103,4 +107,88 @@ public class Main {
 			e.printStackTrace();
 		}
 	}
+	
+	public static void clearBuildUnitUser() throws SQLException{
+		// 建设单位人员id,建设单位id,登陆用户id 
+		String sql1 = " select fsn,funitFsn,femployeeSn from TblBuildUnitUser ";
+		List<String[]> a = memory.query(sql1, new IdsHandler(), new Object[]{});
+		for (String[] s : a) {
+			String sql2 = " select fsn from TblBuildUnit where fsn = ? ";
+			String funitFsn = memory.query(sql2, new ColumnHandler<String>(String.class), new Object[]{s[1]});
+			if(funitFsn == null){ // 如果建设单位为null
+				memory.update(" delete from TblBuildUnitUser where fsn = ? ", new Object[]{s[0]});
+				memory.update(" delete from tblemployeeinfo where femployeesn = ? ", new Object[]{s[2]});
+			}else{
+				String sql3 = " select femployeesn from TblEmployeeInfo where femployeesn = ? ";
+				String femployeeSn = memory.query(sql3, new ColumnHandler<String>(String.class), new Object[]{s[2]});
+				if(femployeeSn == null){
+					memory.update(" delete from TblBuildUnitUser where fsn = ? ", new Object[]{s[0]});
+					memory.update(" delete from tblemployeeinfo where femployeesn = ? ", new Object[]{s[2]});
+				}
+			}
+		}
+		System.out.println("建设单位人员清理完成！");
+	}
+	
+	public static void clearManagerDepUser(){
+		String sql1 = " select fsn,fmanagerFsn as funitFsn,femployeeSn from TblManagerDepUser ";
+		List<String[]> a = memory.query(sql1, new IdsHandler(), new Object[]{});
+		for (String[] s : a) {
+			String sql2 = " select fsn from TblManagerDep where fsn = ? ";
+			String funitFsn = memory.query(sql2, new ColumnHandler<String>(String.class), new Object[]{s[1]});
+			if(funitFsn == null){ // 如果建设单位为null
+				memory.update(" delete from TblManagerDepUser where fsn = ? ", new Object[]{s[0]});
+				memory.update(" delete from tblemployeeinfo where femployeesn = ? ", new Object[]{s[2]});
+			}else{
+				String sql3 = " select femployeesn from TblEmployeeInfo where femployeesn = ? ";
+				String femployeeSn = memory.query(sql3, new ColumnHandler<String>(String.class), new Object[]{s[2]});
+				if(femployeeSn == null){
+					memory.update(" delete from TblManagerDepUser where fsn = ? ", new Object[]{s[0]});
+					memory.update(" delete from tblemployeeinfo where femployeesn = ? ", new Object[]{s[2]});
+				}
+			}
+		}
+		System.out.println("主管单位人员清理完成！");
+	}
+	
+	public static void clearEntrustUser(){
+		String sql1 = " select fsn,fentrustFsn as funitFsn,femployeeSn from TblEntrustUnitUser ";
+		List<String[]> a = memory.query(sql1, new IdsHandler(), new Object[]{});
+		for (String[] s : a) {
+			String sql2 = " select fsn from TblEntrustUnit where fsn = ? ";
+			String funitFsn = memory.query(sql2, new ColumnHandler<String>(String.class), new Object[]{s[1]});
+			if(funitFsn == null){ // 如果建设单位为null
+				memory.update(" delete from TblEntrustUnitUser where fsn = ? ", new Object[]{s[0]});
+				memory.update(" delete from tblemployeeinfo where femployeesn = ? ", new Object[]{s[2]});
+			}else{
+				String sql3 = " select femployeesn from TblEmployeeInfo where femployeesn = ? ";
+				String femployeeSn = memory.query(sql3, new ColumnHandler<String>(String.class), new Object[]{s[2]});
+				if(femployeeSn == null){
+					memory.update(" delete from TblEntrustUnitUser where fsn = ? ", new Object[]{s[0]});
+					memory.update(" delete from tblemployeeinfo where femployeesn = ? ", new Object[]{s[2]});
+				}
+			}
+		}
+		System.out.println("业务处室人员清理完成！");
+	}
 }
+
+class IdsHandler implements ResultSetHandler<List<String[]>>{
+	@Override
+	public List<String[]> handle(ResultSet rs) {
+		List<String[]> list = new ArrayList<String[]>();
+		try {
+			while(rs.next()){
+				String fsn = rs.getString("fsn") == null?"":rs.getString("fsn");
+				String funitFsn = rs.getString("funitFsn") == null?"":rs.getString("funitFsn");
+				String femployeeSn = rs.getLong("femployeeSn")==0 ?"":rs.getString("femployeeSn")+"";
+				String[] ids = new String[]{fsn,funitFsn,femployeeSn};
+				list.add(ids);
+			}
+		} catch (SQLException e) {
+			e.printStackTrace();
+		}
+		return list;
+	}
+}
+

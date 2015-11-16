@@ -14,7 +14,7 @@ public class DBPool {
 	}
 	
 	public DBPool() {
-		audit.ConInfo c = audit.ConInfo.ZHONGJIE;
+		audit.ConInfo c = audit.ConInfo.Local;
 		try {
 			dataSource = new ComboPooledDataSource();
 			dataSource.setUser(c.user);
